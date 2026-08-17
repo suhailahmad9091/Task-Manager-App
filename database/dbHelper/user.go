@@ -4,6 +4,8 @@ import (
 	"Todo/database"
 	"Todo/models"
 	"Todo/utils"
+	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -36,6 +38,11 @@ func CreateUserSession(userID string) (string, error) {
 	return sessionID, crtErr
 }
 
+// ErrInvalidCredentials is returned when the email is unknown or the password
+// does not match. Both cases share one error on purpose, so callers cannot
+// turn the login endpoint into a way of discovering registered emails.
+var ErrInvalidCredentials = errors.New("invalid credentials")
+
 func GetUserID(body models.LoginRequest) (string, error) {
 	SQL := `SELECT u.id,
        			   u.password
@@ -45,10 +52,13 @@ func GetUserID(body models.LoginRequest) (string, error) {
 
 	var user models.LoginData
 	if getErr := database.Todo.Get(&user, SQL, body.Email); getErr != nil {
+		if errors.Is(getErr, sql.ErrNoRows) {
+			return "", ErrInvalidCredentials
+		}
 		return "", getErr
 	}
 	if passwordErr := utils.CheckPassword(body.Password, user.PasswordHash); passwordErr != nil {
-		return "", passwordErr
+		return "", ErrInvalidCredentials
 	}
 	return user.ID, nil
 }

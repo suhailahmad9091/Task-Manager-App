@@ -5,6 +5,7 @@ import (
 	"Todo/models"
 	"Todo/utils"
 	"context"
+	"database/sql"
 	"errors"
 	"net/http"
 	"os"
@@ -47,6 +48,10 @@ func Authenticate(next http.Handler) http.Handler {
 		sessionID := claimValues["sessionId"].(string)
 		archivedAt, err := dbHelper.GetArchivedAt(sessionID)
 		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				utils.RespondError(w, http.StatusUnauthorized, err, "invalid token")
+				return
+			}
 			utils.RespondError(w, http.StatusInternalServerError, err, "internal server error")
 			return
 		}

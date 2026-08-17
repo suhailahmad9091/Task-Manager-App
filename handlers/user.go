@@ -6,6 +6,8 @@ import (
 	"Todo/middlewares"
 	"Todo/models"
 	"Todo/utils"
+	"database/sql"
+	"errors"
 	"net/http"
 
 	"github.com/jmoiron/sqlx"
@@ -30,7 +32,7 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if exists {
-		utils.RespondError(w, http.StatusBadRequest, nil, "user already exists")
+		utils.RespondError(w, http.StatusConflict, nil, "user already exists")
 		return
 	}
 
@@ -45,7 +47,7 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.RespondJSON(w, http.StatusOK, struct {
+	utils.RespondJSON(w, http.StatusCreated, struct {
 		Message string `json:"message"`
 	}{"user created successfully"})
 }
@@ -65,12 +67,11 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 
 	userID, userErr := dbHelper.GetUserID(body)
 	if userErr != nil {
+		if errors.Is(userErr, dbHelper.ErrInvalidCredentials) {
+			utils.RespondError(w, http.StatusUnauthorized, userErr, "invalid email or password")
+			return
+		}
 		utils.RespondError(w, http.StatusInternalServerError, userErr, "failed to find user")
-		return
-	}
-
-	if userID == "" {
-		utils.RespondError(w, http.StatusBadRequest, nil, "user not found")
 		return
 	}
 
@@ -98,6 +99,10 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 
 	user, getErr := dbHelper.GetUser(userID)
 	if getErr != nil {
+		if errors.Is(getErr, sql.ErrNoRows) {
+			utils.RespondError(w, http.StatusNotFound, getErr, "user not found")
+			return
+		}
 		utils.RespondError(w, http.StatusInternalServerError, getErr, "failed to get user")
 		return
 	}

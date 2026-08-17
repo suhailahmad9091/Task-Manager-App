@@ -6,7 +6,10 @@ import (
 	"Todo/middlewares"
 	"Todo/models"
 	"Todo/utils"
+	"database/sql"
+	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"
@@ -33,7 +36,7 @@ func CreateTodo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if exists {
-		utils.RespondError(w, http.StatusBadRequest, nil, "todo already exists")
+		utils.RespondError(w, http.StatusConflict, nil, "todo already exists")
 		return
 	}
 
@@ -42,7 +45,7 @@ func CreateTodo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.RespondJSON(w, http.StatusOK, struct {
+	utils.RespondJSON(w, http.StatusCreated, struct {
 		Message string `json:"message"`
 	}{"todo created successfully"})
 }
@@ -50,6 +53,15 @@ func CreateTodo(w http.ResponseWriter, r *http.Request) {
 func GetAllTodos(w http.ResponseWriter, r *http.Request) {
 	keyword := r.URL.Query().Get("keyword")
 	completed := r.URL.Query().Get("completed")
+
+	// Checked here rather than letting Postgres fail the CAST, which would
+	// report a caller mistake as a server error.
+	if completed != "" {
+		if _, parseErr := strconv.ParseBool(completed); parseErr != nil {
+			utils.RespondError(w, http.StatusBadRequest, parseErr, "completed must be true or false")
+			return
+		}
+	}
 
 	userCtx := middlewares.UserContext(r)
 	userID := userCtx.UserID
@@ -71,6 +83,10 @@ func MarkCompleted(w http.ResponseWriter, r *http.Request) {
 
 	updErr := dbHelper.MarkCompleted(todoID, userID)
 	if updErr != nil {
+		if errors.Is(updErr, sql.ErrNoRows) {
+			utils.RespondError(w, http.StatusNotFound, updErr, "todo not found")
+			return
+		}
 		utils.RespondError(w, http.StatusInternalServerError, updErr, "failed to mark todo completed")
 		return
 	}
@@ -88,6 +104,10 @@ func DeleteTodo(w http.ResponseWriter, r *http.Request) {
 
 	delErr := dbHelper.DeleteTodo(todoID, userID)
 	if delErr != nil {
+		if errors.Is(delErr, sql.ErrNoRows) {
+			utils.RespondError(w, http.StatusNotFound, delErr, "todo not found")
+			return
+		}
 		utils.RespondError(w, http.StatusInternalServerError, delErr, "failed to delete todo")
 		return
 	}

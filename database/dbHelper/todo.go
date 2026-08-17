@@ -3,9 +3,23 @@ package dbHelper
 import (
 	"Todo/database"
 	"Todo/models"
+	"database/sql"
 
 	"github.com/jmoiron/sqlx"
 )
+
+// checkRowsAffected turns an update that matched nothing into sql.ErrNoRows,
+// so callers can tell "not found" apart from a successful write.
+func checkRowsAffected(res sql.Result) error {
+	rows, rowsErr := res.RowsAffected()
+	if rowsErr != nil {
+		return rowsErr
+	}
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
 
 func IsTodoExists(name, userID string) (bool, error) {
 	SQL := `SELECT count(id) > 0 as is_exist
@@ -42,26 +56,36 @@ func GetAllTodos(userID, keyword, completed string) ([]models.Todo, error) {
 	return todos, getErr
 }
 
+// MarkCompleted returns sql.ErrNoRows when the todo does not exist, is already
+// archived, or belongs to a different user.
 func MarkCompleted(todoID, userID string) error {
 	SQL := `UPDATE todos
-              SET is_completed = true        
-              WHERE id = $1                  
-                AND user_id = $2             
+              SET is_completed = true
+              WHERE id = $1
+                AND user_id = $2
                 AND archived_at IS NULL`
 
-	_, updErr := database.Todo.Exec(SQL, todoID, userID)
-	return updErr
+	res, updErr := database.Todo.Exec(SQL, todoID, userID)
+	if updErr != nil {
+		return updErr
+	}
+	return checkRowsAffected(res)
 }
 
+// DeleteTodo returns sql.ErrNoRows when the todo does not exist, is already
+// archived, or belongs to a different user.
 func DeleteTodo(todoID, userID string) error {
 	SQL := `UPDATE todos
-			  SET archived_at = NOW()        
-			  WHERE id = $1                  
-			    AND user_id = $2             
+			  SET archived_at = NOW()
+			  WHERE id = $1
+			    AND user_id = $2
 			    AND archived_at IS NULL`
 
-	_, delErr := database.Todo.Exec(SQL, todoID, userID)
-	return delErr
+	res, delErr := database.Todo.Exec(SQL, todoID, userID)
+	if delErr != nil {
+		return delErr
+	}
+	return checkRowsAffected(res)
 }
 
 func DeleteAllTodos(tx *sqlx.Tx, userID string) error {
