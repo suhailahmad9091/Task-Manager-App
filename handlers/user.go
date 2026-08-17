@@ -6,9 +6,9 @@ import (
 	"Todo/middlewares"
 	"Todo/models"
 	"Todo/utils"
-	"github.com/go-playground/validator/v10"
-	"github.com/jmoiron/sqlx"
 	"net/http"
+
+	"github.com/jmoiron/sqlx"
 )
 
 func RegisterUser(w http.ResponseWriter, r *http.Request) {
@@ -19,9 +19,8 @@ func RegisterUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	v := validator.New()
-	if err := v.Struct(body); err != nil {
-		utils.RespondError(w, http.StatusBadRequest, err, "input validation failed")
+	if valErr := utils.ValidateStruct(body); valErr != nil {
+		utils.RespondError(w, http.StatusBadRequest, valErr, "input validation failed")
 		return
 	}
 
@@ -59,9 +58,8 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	v := validator.New()
-	if err := v.Struct(body); err != nil {
-		utils.RespondError(w, http.StatusBadRequest, err, "input validation failed")
+	if valErr := utils.ValidateStruct(body); valErr != nil {
+		utils.RespondError(w, http.StatusBadRequest, valErr, "input validation failed")
 		return
 	}
 
@@ -72,7 +70,7 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if userID == "" {
-		utils.RespondError(w, http.StatusOK, nil, "user not found")
+		utils.RespondError(w, http.StatusBadRequest, nil, "user not found")
 		return
 	}
 
