@@ -3,6 +3,7 @@ package database
 import (
 	"errors"
 	"fmt"
+
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -29,14 +30,23 @@ func ConnectAndMigrate(host, port, databaseName, user, password string, sslMode 
 		return err
 	}
 
-	err = DB.Ping()
-	if err != nil {
+	if err := DB.Ping(); err != nil {
+		if closeErr := DB.Close(); closeErr != nil {
+			logrus.Errorf("failed to close db: %s", closeErr)
+		}
+		return err
+	}
+
+	if err := migrateUp(DB); err != nil {
+		if closeErr := DB.Close(); closeErr != nil {
+			logrus.Errorf("failed to close db: %s", closeErr)
+		}
 		return err
 	}
 
 	Todo = DB
 
-	return migrateUp(DB)
+	return nil
 }
 
 func ShutdownDatabase() error {
@@ -62,7 +72,7 @@ func migrateUp(db *sqlx.DB) error {
 	return nil
 }
 
-func Tx(fn func(tx *sqlx.Tx) error) error {
+func Tx(fn func(tx *sqlx.Tx) error) (err error) {
 	tx, err := Todo.Beginx()
 	if err != nil {
 		return fmt.Errorf("failed to start a transaction: %+v", err)
@@ -76,6 +86,7 @@ func Tx(fn func(tx *sqlx.Tx) error) error {
 		}
 		if commitErr := tx.Commit(); commitErr != nil {
 			logrus.Errorf("failed to commit tx: %s", commitErr)
+			err = commitErr
 		}
 	}()
 	err = fn(tx)

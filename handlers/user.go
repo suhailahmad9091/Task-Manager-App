@@ -124,15 +124,17 @@ func LogoutUser(w http.ResponseWriter, r *http.Request) {
 func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	userCtx := middlewares.UserContext(r)
 	userID := userCtx.UserID
-	sessionID := userCtx.SessionID
 
 	txErr := database.Tx(func(tx *sqlx.Tx) error {
-		delErr := dbHelper.DeleteUser(userID)
-		if delErr != nil {
+		if delErr := dbHelper.DeleteUser(tx, userID); delErr != nil {
 			return delErr
 		}
 
-		return dbHelper.DeleteUserSession(sessionID)
+		if delErr := dbHelper.DeleteAllTodos(tx, userID); delErr != nil {
+			return delErr
+		}
+
+		return dbHelper.DeleteAllUserSessions(tx, userID)
 	})
 	if txErr != nil {
 		utils.RespondError(w, http.StatusInternalServerError, txErr, "failed to delete user account")

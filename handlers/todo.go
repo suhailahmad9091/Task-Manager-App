@@ -1,13 +1,16 @@
 package handlers
 
 import (
+	"Todo/database"
 	"Todo/database/dbHelper"
 	"Todo/middlewares"
 	"Todo/models"
 	"Todo/utils"
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator/v10"
-	"net/http"
+	"github.com/jmoiron/sqlx"
 )
 
 func CreateTodo(w http.ResponseWriter, r *http.Request) {
@@ -100,7 +103,9 @@ func DeleteAllTodos(w http.ResponseWriter, r *http.Request) {
 	userCtx := middlewares.UserContext(r)
 	userID := userCtx.UserID
 
-	delErr := dbHelper.DeleteAllTodos(userID)
+	delErr := database.Tx(func(tx *sqlx.Tx) error {
+		return dbHelper.DeleteAllTodos(tx, userID)
+	})
 	if delErr != nil {
 		utils.RespondError(w, http.StatusInternalServerError, delErr, "failed to delete todos")
 		return

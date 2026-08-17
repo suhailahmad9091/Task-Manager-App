@@ -1,7 +1,7 @@
 package models
 
 type TodoRequest struct {
-	UserID      string `json:"user_id"`
+	UserID      string `json:"userId"`
 	Name        string `json:"name" validate:"required"`
 	Description string `json:"description" validate:"required"`
 }

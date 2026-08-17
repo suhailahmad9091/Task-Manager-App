@@ -3,6 +3,8 @@ package dbHelper
 import (
 	"Todo/database"
 	"Todo/models"
+
+	"github.com/jmoiron/sqlx"
 )
 
 func IsTodoExists(name, userID string) (bool, error) {
@@ -62,12 +64,12 @@ func DeleteTodo(todoID, userID string) error {
 	return delErr
 }
 
-func DeleteAllTodos(userID string) error {
+func DeleteAllTodos(tx *sqlx.Tx, userID string) error {
 	SQL := `UPDATE todos
-              SET archived_at = NOW()        
-              WHERE user_id = $1             
+              SET archived_at = NOW()
+              WHERE user_id = $1
                 AND archived_at IS NULL`
 
-	_, delErr := database.Todo.Exec(SQL, userID)
+	_, delErr := tx.Exec(SQL, userID)
 	return delErr
 }

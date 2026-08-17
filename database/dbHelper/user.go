@@ -5,6 +5,8 @@ import (
 	"Todo/models"
 	"Todo/utils"
 	"time"
+
+	"github.com/jmoiron/sqlx"
 )
 
 func IsUserExists(email string) (bool, error) {
@@ -83,12 +85,22 @@ func DeleteUserSession(sessionID string) error {
 	return delErr
 }
 
-func DeleteUser(userID string) error {
+func DeleteAllUserSessions(tx *sqlx.Tx, userID string) error {
+	SQL := `UPDATE user_session
+			  SET archived_at = NOW()
+			  WHERE user_id = $1
+			    AND archived_at IS NULL`
+
+	_, delErr := tx.Exec(SQL, userID)
+	return delErr
+}
+
+func DeleteUser(tx *sqlx.Tx, userID string) error {
 	SQL := `UPDATE users
 			  SET archived_at = NOW()
 			  WHERE id = $1
 			    AND archived_at IS NULL`
 
-	_, delErr := database.Todo.Exec(SQL, userID)
+	_, delErr := tx.Exec(SQL, userID)
 	return delErr
 }
